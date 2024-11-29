@@ -8,11 +8,16 @@ import chatSocket from './sockets/chat.socket';
 import dotenv from 'dotenv';
 dotenv.config();
 
+const corsOptions = {
+  origin: 'http://localhost:4321',
+  methods: ["GET", "POST"]
+}
+
 // Create server
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
@@ -21,10 +26,7 @@ app.use('/api/chat', chatRouter);
 // Create HTTP server and attach Socket.IO
 const server = createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '', // Your frontend url here (Astro, React, vanilla HTML)
-    methods: ["GET", "POST"]
-  },
+  cors: corsOptions,
 });
 
 // Connect to MongoDB and start server

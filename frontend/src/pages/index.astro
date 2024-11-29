@@ -1,0 +1,206 @@
+---
+
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Chatroom</title>
+	</head>
+	<body>
+    <div class="container">
+      <h1>Chatroom</h1>
+      <p>Select a room and let's start chatting!</p>
+      <div class="btnWrap">
+        <button class="roomBtn isSelected" data-room="room1">Room 1</button>
+        <button class="roomBtn" data-room="room2">Room 2</button>
+        <button class="roomBtn" data-room="room3">Room 3</button>
+      </div>
+      <form action="" class="form">
+        <input type="text" id="username" placeholder="Enter your username">
+        <input type="text" id="message" placeholder="Enter your message">
+        <button type="submit" class="submitBtn">Send message</button>
+      </form>
+      <div class="messagesWrap">
+        <ul class="messages"></ul>
+      </div>
+    </div>
+	</body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .container {
+    padding: 40px;
+  }
+
+  .btnWrap {
+    display: flex;
+    gap: 24px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 24px;
+  }
+
+  .roomBtn {
+    border: none;
+    background-color: white;
+    padding: 16px 24px;
+    width: 33%;
+    font-weight: bold;
+    color: #999;
+  }
+
+  .isSelected {
+    border-bottom: 1px solid cornflowerblue;
+    color: cornflowerblue;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  input {
+    padding: 8px 16px;
+    border: 1px solid #ececec;
+    border-radius: 4px;
+    background-color: #f6f6f6;
+  }
+
+  .submitBtn {
+    padding: 8px 16px;
+    border: none;
+    background-color: cornflowerblue;
+    width: 30%;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    margin-bottom: 48px;
+  }
+
+  .messagesWrap {
+    padding: 1.6rem;
+    background-color: #f6f6f6;
+    border-radius: 4px;
+  }
+
+  ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 0;
+    margin: 0;
+  }
+
+  strong {
+
+  }
+</style>
+
+<script is:inline type="module">
+  import { io } from "https://cdn.socket.io/4.8.1/socket.io.esm.min.js";
+  const socket = io("http://localhost:3000")
+
+  const roomButtons = document.querySelectorAll('.roomBtn')
+
+  const messageForm = document.querySelector(".form")
+
+  const messages = document.querySelector(".messages")
+  const messageInput = messageForm.querySelector("#message")
+  const usernameInput = messageForm.querySelector("#username")
+
+  let currRoom = '';
+
+  async function fetchAllMessages() {
+    try {
+      const res = await fetch(`http://localhost:3000/api/chat`)
+      const data = await res.json()
+
+      data.forEach(message => {
+        const li = document.createElement('li')
+        li.innerHTML = `<strong>${message.username}</strong>: ${message.message}`;
+        messages.appendChild(li)
+      })
+    } catch(err) {
+      console.error(`Failed to fetch data`, err)
+    }
+  }
+
+  async function fetchMessagesByRoom(room) {
+    try {
+      const res = await fetch(`http://localhost:3000/api/chat/room?room=${room}`)
+      if(!res.ok) 
+        throw new Error(`Failed to fetch data`)
+      const data = await res.json()
+
+      messages.innerHTML = "";
+
+      data.forEach(message => {
+        const li = document.createElement("li")
+        li.innerHTML = `<strong>${message.username}</strong>: ${message.message}`;
+        messages.appendChild(li)
+      })
+    } catch(err) {
+      console.error(err)
+    }
+  }
+
+
+  roomButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newRoom = btn.getAttribute('data-room')
+      const username = usernameInput.value.trim() || 'Anonymous'
+
+      if(currRoom) {
+        socket.emit('leaveRoom', { room: currRoom, username })
+      }
+
+      roomButtons.forEach(btn => btn.classList.remove('isSelected'))
+      btn.classList.add("isSelected");
+
+      currRoom = newRoom;
+      socket.emit('joinRoom', { room: currRoom, username })
+
+      fetchMessagesByRoom(currRoom)
+    })
+  })
+
+
+  messageForm.addEventListener("submit", (e) => {
+    e.preventDefault()
+
+    const usernameValue = usernameInput.value.trim()
+    const messageValue = messageInput.value.trim()
+
+    if(currRoom && messageValue) {
+      socket.emit("sendMessage", {
+        username: usernameValue,
+        message: messageValue,
+        room: currRoom
+      })
+      messageInput.value = "";
+    } else {
+      throw new Error(`Room not selected or message is empty`)
+    }
+  })
+
+  socket.on("newMessage", (data) => {
+    if(data.room === currRoom || !data.room) {
+      const li = document.createElement("li")
+      li.innerHTML = `<strong>${data.username}</strong>: ${data.message}`
+      messages.appendChild(li)
+    }
+  })
+
+  // fetchAllMessages();
+</script>
+
